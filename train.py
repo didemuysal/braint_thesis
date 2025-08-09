@@ -17,6 +17,7 @@ from data_loader import BrainTumourDataset
 from model import create_brain_tumour_model
 from cross_validation import create_the_folds
 from class_names import class_names 
+from thop import profile
 
 def main(command_line_args):
     
@@ -103,6 +104,15 @@ def main(command_line_args):
     model_for_info = create_brain_tumour_model(model_name=settings.model)
     model_head_string = str(model_for_info.fc)
 
+    print("Calculating model parameters and FLOPs...")
+    model_for_info.to(device) 
+    dummy_input = torch.randn(1, 3, 224, 224).to(device) # 1 colour 3 channel 224x224
+    flops, params = profile(model_for_info, inputs=(dummy_input,), verbose=False)
+    gflops = flops / 1e9   # Convert to GFLOPs (Giga FLOPs) and Parameters in Millions
+    params_m = params / 1e6
+    
+    print(f" Model: {settings.model}, parameters: {params_m:.2f}M, GFLOPs: {gflops:.2f}G")
+
 
     results_dataframe = pd.DataFrame(results_from_all_folds)
     mean_metrics = results_dataframe.drop(columns=['fold']).mean().to_dict()
@@ -117,6 +127,8 @@ def main(command_line_args):
         "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A",
         "command_line_input_args": vars(command_line_args),
         "effective_experiment_settings": vars(settings),
+        "model_gflops": gflops,
+        "model_params_m": params_m,
         "model_architecture_head": model_head_string,
         "training_data_augmentation": data_augmentation_string,
         "final_summary_metrics_mean": mean_metrics,
