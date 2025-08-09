@@ -59,7 +59,6 @@ def train_fold(model, train_loader, val_loader, criterion, args, device):
         print(f"Stage 1 (Finetune): Training only the head for {args.head_epochs} epochs.")
         for epoch in range(args.head_epochs):
             run_one_epoch(model, train_loader, criterion, head_optimizer, device)
-        
         for param in model.parameters():
             param.requires_grad = True
 
@@ -85,6 +84,7 @@ def train_fold(model, train_loader, val_loader, criterion, args, device):
         main_optimizer = get_optimizer(model.parameters(), args.optimizer, main_lr)
         print(f"Strategy ({args.strategy}): Training full network (no head warm-up) for {args.max_epochs} epochs.")
 
+    
     for epoch in range(args.max_epochs):
         run_one_epoch(model, train_loader, criterion, main_optimizer, device)
         
@@ -102,5 +102,6 @@ def train_fold(model, train_loader, val_loader, criterion, args, device):
             if epochs_no_improve >= args.patience:
                 print(f"Early stopped after {args.patience} epochs.")
                 break
-        
+    
+
     return best_model_state

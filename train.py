@@ -55,6 +55,7 @@ def main(command_line_args):
     results_from_all_folds = []
     total_confusion_matrix = np.zeros((len(class_names), len(class_names)), dtype=int)
     all_roc_data = []
+    start_time_experiment = time.time()
 
     model_for_info = create_brain_tumour_model(model_name=settings.model)
     model_head_string = str(model_for_info.fc)
@@ -96,6 +97,9 @@ def main(command_line_args):
         all_roc_data.append(roc_data)
         print(f"Fold {fold_number} Test Accuracy: {fold_results['test_accuracy']:.3%}")
 
+    end_time_experiment = time.time()
+    total_experiment_training_time_sec = end_time_experiment - start_time_experiment   
+
     generate_and_save_summary_report(
         results_from_all_folds, total_confusion_matrix, all_roc_data,
         folders, folders['experiment_name']
@@ -133,6 +137,7 @@ def main(command_line_args):
         "training_data_augmentation": data_augmentation_string,
         "final_summary_metrics_mean": mean_metrics,
         "final_summary_metrics_std": std_metrics,
+        "total_experiment_training_time_sec": total_experiment_training_time_sec,
         "results_csv_path": os.path.relpath(os.path.join(folders['report_dir'], "all_folds_results.csv"), folders['base_dir']),
         "confusion_matrix_plot_path": os.path.relpath(os.path.join(folders['report_dir'], "confusion_matrix.png"), folders['base_dir']),
         "roc_curve_plot_path": os.path.relpath(os.path.join(folders['report_dir'], "roc_curves.png"), folders['base_dir'])
