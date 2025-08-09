@@ -31,4 +31,3 @@ FOR %%M IN (%MODELS%) DO (
 )
 
 echo All experiment runs are complete.
-pause

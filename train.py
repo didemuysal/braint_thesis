@@ -55,13 +55,14 @@ def main(command_line_args):
     results_from_all_folds = []
     total_confusion_matrix = np.zeros((len(class_names), len(class_names)), dtype=int)
     all_roc_data = []
-    start_time_experiment = time.time()
 
     model_for_info = create_brain_tumour_model(model_name=settings.model)
     model_head_string = str(model_for_info.fc)
     
     dummy_train_dataset = BrainTumourDataset(settings.data_folder, [], [], is_train=True)
     data_augmentation_string = str(dummy_train_dataset.transform)
+
+    total_inference_start_time = time.time()
 
     for fold_index, (train_files, train_labels, val_files, val_labels, test_files, test_labels_original) in enumerate(all_the_folds):
         fold_number = fold_index + 1
@@ -86,9 +87,15 @@ def main(command_line_args):
 
         print(f"Testing best model from Fold {fold_number}...")
         model.load_state_dict(best_model_weights)
+        start_time_inference = time.time()
         test_loss, returned_test_labels, test_predictions, test_scores = run_one_epoch(model, test_loader, loss_function, None, device)
 
+        end_time_inference = time.time()
+        inference_duration_sec = end_time_inference - start_time_inference
+        print(f"> Fold {fold_number} inference took: {inference_duration_sec:.2f} seconds.")
+
         fold_results, roc_data = calculate_test_metrics_for_fold(returned_test_labels, test_predictions, test_scores)
+        fold_results['inference_time_sec'] = inference_duration_sec
         fold_results['fold'] = fold_number
         fold_results['test_loss'] = test_loss
         results_from_all_folds.append(fold_results)
@@ -96,9 +103,10 @@ def main(command_line_args):
         total_confusion_matrix += confusion_matrix(returned_test_labels, test_predictions, labels=sorted(class_names.keys()))
         all_roc_data.append(roc_data)
         print(f"Fold {fold_number} Test Accuracy: {fold_results['test_accuracy']:.3%}")
-
-    end_time_experiment = time.time()
-    total_experiment_training_time_sec = end_time_experiment - start_time_experiment   
+    
+    total_inference_end_time = time.time()
+    total_inference_duration_sec = total_inference_end_time - total_inference_start_time
+    print(f"\nTotal inference time for the entire experiment: {total_inference_duration_sec:.2f} seconds.")
 
     generate_and_save_summary_report(
         results_from_all_folds, total_confusion_matrix, all_roc_data,
@@ -119,8 +127,15 @@ def main(command_line_args):
 
 
     results_dataframe = pd.DataFrame(results_from_all_folds)
-    mean_metrics = results_dataframe.drop(columns=['fold']).mean().to_dict()
-    std_metrics = results_dataframe.drop(columns=['fold']).std().to_dict()
+    mean_inference_time = results_dataframe['inference_time_sec'].mean()
+    std_inference_time = results_dataframe['inference_time_sec'].std()
+
+    mean_metrics = results_dataframe.drop(columns=['fold', 'inference_time_sec']).mean().to_dict()
+    std_metrics = results_dataframe.drop(columns=['fold', 'inference_time_sec']).std().to_dict()
+
+    mean_metrics['inference_time_sec'] = mean_inference_time
+    std_metrics['inference_time_sec'] = std_inference_time
+
 
     experiment_details = {
         "run_date": time.ctime(),
@@ -137,7 +152,7 @@ def main(command_line_args):
         "training_data_augmentation": data_augmentation_string,
         "final_summary_metrics_mean": mean_metrics,
         "final_summary_metrics_std": std_metrics,
-        "total_experiment_training_time_sec": total_experiment_training_time_sec,
+        "total_inference_time_sec": total_inference_duration_sec,
         "results_csv_path": os.path.relpath(os.path.join(folders['report_dir'], "all_folds_results.csv"), folders['base_dir']),
         "confusion_matrix_plot_path": os.path.relpath(os.path.join(folders['report_dir'], "confusion_matrix.png"), folders['base_dir']),
         "roc_curve_plot_path": os.path.relpath(os.path.join(folders['report_dir'], "roc_curves.png"), folders['base_dir'])
